@@ -18,6 +18,15 @@ type AnalyticsResponse struct {
 }
 
 // GetAnalytics retrieves analytics data from the follower pool
+// @Summary      Get analytics overview
+// @Description  Get overall analytics statistics including customer and account counts
+// @Tags         analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  AnalyticsResponse
+// @Failure      500  {object}  map[string]string
+// @Router       /analytics [get]
+// @Security     BearerAuth
 func GetAnalytics(c *gin.Context) {
 	// Use analytics DB (follower pool) for read-only analytics queries
 	analyticsDB := db.AnalyticsDB
@@ -75,6 +84,16 @@ func GetAnalytics(c *gin.Context) {
 }
 
 // GetCustomerAnalytics retrieves analytics for a specific customer
+// @Summary      Get customer analytics
+// @Description  Get analytics for a specific customer including account counts
+// @Tags         analytics
+// @Accept       json
+// @Produce      json
+// @Param        customer_id  path      string  true  "Customer ID"
+// @Success      200          {object}  map[string]interface{}
+// @Failure      500          {object}  map[string]string
+// @Router       /analytics/customers/{customer_id} [get]
+// @Security     BearerAuth
 func GetCustomerAnalytics(c *gin.Context) {
 	customerID := c.Param("customer_id")
 

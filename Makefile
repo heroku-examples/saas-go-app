@@ -59,3 +59,10 @@ frontend-build:
 # Build everything (backend + frontend)
 build-all: frontend-build build
 
+# Generate Swagger documentation
+swagger:
+	@which swag > /dev/null 2>&1 && swag init -g main.go -o ./docs || go run github.com/swaggo/swag/cmd/swag@latest init -g main.go -o ./docs
+
+# Build everything including Swagger docs
+build-all-docs: swagger frontend-build build
+

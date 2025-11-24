@@ -16,6 +16,14 @@ type HealthResponse struct {
 }
 
 // HealthCheck performs a health check on the service
+// @Summary      Health check
+// @Description  Check the health status of the service and database connections
+// @Tags         health
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  HealthResponse
+// @Failure      503  {object}  HealthResponse
+// @Router       /health [get]
 func HealthCheck(c *gin.Context) {
 	response := HealthResponse{
 		Status: "healthy",

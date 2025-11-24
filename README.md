@@ -10,6 +10,7 @@ A SaaS web application backend built with Go and Gin, featuring Vue.js frontend,
 - **Analytics Endpoints** that read from follower pools
 - **Health Checks** and Prometheus metrics
 - **Vue.js Frontend** with Bootstrap styling
+- **Swagger/OpenAPI Documentation** with interactive API testing
 
 ## Tech Stack
 
@@ -114,6 +115,8 @@ npm run build
 
 ## API Endpoints
 
+> **📚 Interactive API Documentation**: Access the full Swagger UI at `/swagger/index.html` for interactive testing, request/response schemas, and detailed endpoint documentation.
+
 ### Authentication
 - `POST /api/auth/login` - Login and get JWT token
 - `POST /api/auth/register` - Register a new user
@@ -139,6 +142,71 @@ npm run build
 ### Health & Metrics
 - `GET /health` - Health check endpoint
 - `GET /metrics` - Prometheus metrics
+
+## API Documentation (Swagger)
+
+The API includes comprehensive interactive Swagger/OpenAPI documentation powered by Swagger UI. This provides a complete reference for all endpoints with the ability to test them directly from your browser.
+
+### Quick Access
+
+Once the server is running, visit:
+- **Local Development**: `http://localhost:8080/swagger/index.html`
+- **Heroku Production**: `https://your-app-name.herokuapp.com/swagger/index.html`
+
+### Features
+
+The Swagger UI provides:
+- **Complete API Documentation**: All endpoints with descriptions, parameters, and examples
+- **Request/Response Schemas**: Detailed JSON schemas for all request and response bodies
+- **Interactive Testing**: Try any endpoint directly from the browser without external tools
+- **JWT Authentication**: Built-in support for testing protected endpoints with Bearer tokens
+- **Model Definitions**: View all data models (Customer, Account, etc.) with their fields and types
+
+### Generating Swagger Docs
+
+If you modify API handlers or add new endpoints, regenerate the Swagger documentation:
+
+```bash
+make swagger
+# or manually:
+swag init -g main.go -o ./docs
+```
+
+The Makefile will automatically use `swag` if installed, or fall back to `go run` if not.
+
+### Using Swagger UI
+
+#### Step 1: Get Authentication Token
+
+1. In Swagger UI, find the **Authentication** section (`/api/auth/login`)
+2. Click "Try it out"
+3. Enter your credentials:
+   ```json
+   {
+     "username": "your-username",
+     "password": "your-password"
+   }
+   ```
+4. Click "Execute" and copy the `token` from the response
+
+#### Step 2: Authorize in Swagger UI
+
+1. Click the **"Authorize"** button at the top of the Swagger UI (🔒 icon)
+2. In the "Value" field, enter: `Bearer {your-token}`
+   - **Important**: Include the word "Bearer" followed by a space, then your token
+   - Example: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+3. Click "Authorize" then "Close"
+
+#### Step 3: Test Protected Endpoints
+
+1. Navigate to any protected endpoint (customers, accounts, analytics)
+2. Click on the endpoint to expand it
+3. Click **"Try it out"**
+4. Fill in any required parameters
+5. Click **"Execute"**
+6. View the response with status code, headers, and body
+
+**Note**: Once authorized, all protected endpoints will automatically include your JWT token in the `Authorization` header.
 
 ## Heroku Deployment
 

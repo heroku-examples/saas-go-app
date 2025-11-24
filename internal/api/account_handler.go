@@ -12,6 +12,15 @@ import (
 )
 
 // GetAccounts retrieves all accounts
+// @Summary      List all accounts
+// @Description  Get a list of all accounts
+// @Tags         accounts
+// @Accept       json
+// @Produce      json
+// @Success      200  {array}   models.Account
+// @Failure      500  {object}  map[string]string
+// @Router       /accounts [get]
+// @Security     BearerAuth
 func GetAccounts(c *gin.Context) {
 	rows, err := db.PrimaryDB.Query(
 		"SELECT id, customer_id, name, status, created_at, updated_at FROM accounts ORDER BY created_at DESC",
@@ -36,6 +45,17 @@ func GetAccounts(c *gin.Context) {
 }
 
 // GetAccount retrieves a single account by ID
+// @Summary      Get account by ID
+// @Description  Get a specific account by its ID
+// @Tags         accounts
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int  true  "Account ID"
+// @Success      200  {object}  models.Account
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /accounts/{id} [get]
+// @Security     BearerAuth
 func GetAccount(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -62,6 +82,16 @@ func GetAccount(c *gin.Context) {
 }
 
 // CreateAccount creates a new account
+// @Summary      Create new account
+// @Description  Create a new account record
+// @Tags         accounts
+// @Accept       json
+// @Produce      json
+// @Param        account  body      models.CreateAccountRequest  true  "Account data"
+// @Success      201      {object}  models.Account
+// @Failure      400      {object}  map[string]string
+// @Router       /accounts [post]
+// @Security     BearerAuth
 func CreateAccount(c *gin.Context) {
 	var req models.CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,6 +114,18 @@ func CreateAccount(c *gin.Context) {
 }
 
 // UpdateAccount updates an existing account
+// @Summary      Update account
+// @Description  Update an existing account record
+// @Tags         accounts
+// @Accept       json
+// @Produce      json
+// @Param        id       path      int                         true  "Account ID"
+// @Param        account  body      models.UpdateAccountRequest true  "Updated account data"
+// @Success      200      {object}  models.Account
+// @Failure      400      {object}  map[string]string
+// @Failure      404      {object}  map[string]string
+// @Router       /accounts/{id} [put]
+// @Security     BearerAuth
 func UpdateAccount(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -116,6 +158,17 @@ func UpdateAccount(c *gin.Context) {
 }
 
 // DeleteAccount deletes an account
+// @Summary      Delete account
+// @Description  Delete an account by ID
+// @Tags         accounts
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int  true  "Account ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /accounts/{id} [delete]
+// @Security     BearerAuth
 func DeleteAccount(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

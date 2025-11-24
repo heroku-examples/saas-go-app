@@ -14,7 +14,30 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	
+	_ "saas-go-app/docs" // Swagger docs
 )
+
+// @title           SaaS Go App API
+// @version         1.0
+// @description     A SaaS application backend API built with Go and Gin, featuring JWT authentication, customer and account management, and analytics.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.email  support@example.com
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /api
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token. Example: "Bearer {token}"
 
 func main() {
 	// Load environment variables from .env file (if it exists)
@@ -130,6 +153,9 @@ func main() {
 
 	// Health check endpoint
 	router.GET("/health", api.HealthCheck)
+
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Public routes
 	apiRoutes := router.Group("/api")

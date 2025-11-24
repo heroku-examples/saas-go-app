@@ -12,6 +12,15 @@ import (
 )
 
 // GetCustomers retrieves all customers
+// @Summary      List all customers
+// @Description  Get a list of all customers
+// @Tags         customers
+// @Accept       json
+// @Produce      json
+// @Success      200  {array}   models.Customer
+// @Failure      500  {object}  map[string]string
+// @Router       /customers [get]
+// @Security     BearerAuth
 func GetCustomers(c *gin.Context) {
 	rows, err := db.PrimaryDB.Query(
 		"SELECT id, name, email, created_at, updated_at FROM customers ORDER BY created_at DESC",
@@ -36,6 +45,17 @@ func GetCustomers(c *gin.Context) {
 }
 
 // GetCustomer retrieves a single customer by ID
+// @Summary      Get customer by ID
+// @Description  Get a specific customer by their ID
+// @Tags         customers
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int  true  "Customer ID"
+// @Success      200  {object}  models.Customer
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /customers/{id} [get]
+// @Security     BearerAuth
 func GetCustomer(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -62,6 +82,16 @@ func GetCustomer(c *gin.Context) {
 }
 
 // CreateCustomer creates a new customer
+// @Summary      Create new customer
+// @Description  Create a new customer record
+// @Tags         customers
+// @Accept       json
+// @Produce      json
+// @Param        customer  body      models.CreateCustomerRequest  true  "Customer data"
+// @Success      201       {object}  models.Customer
+// @Failure      400       {object}  map[string]string
+// @Router       /customers [post]
+// @Security     BearerAuth
 func CreateCustomer(c *gin.Context) {
 	var req models.CreateCustomerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,6 +114,18 @@ func CreateCustomer(c *gin.Context) {
 }
 
 // UpdateCustomer updates an existing customer
+// @Summary      Update customer
+// @Description  Update an existing customer record
+// @Tags         customers
+// @Accept       json
+// @Produce      json
+// @Param        id         path      int                           true  "Customer ID"
+// @Param        customer   body      models.UpdateCustomerRequest  true  "Updated customer data"
+// @Success      200        {object}  models.Customer
+// @Failure      400        {object}  map[string]string
+// @Failure      404        {object}  map[string]string
+// @Router       /customers/{id} [put]
+// @Security     BearerAuth
 func UpdateCustomer(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -116,6 +158,17 @@ func UpdateCustomer(c *gin.Context) {
 }
 
 // DeleteCustomer deletes a customer
+// @Summary      Delete customer
+// @Description  Delete a customer by ID
+// @Tags         customers
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int  true  "Customer ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /customers/{id} [delete]
+// @Security     BearerAuth
 func DeleteCustomer(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
