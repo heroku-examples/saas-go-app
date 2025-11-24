@@ -141,7 +141,7 @@ heroku login
 heroku create saas-go-app
 
 # Provision Postgres Advanced
-heroku addons:create heroku-postgresql:standard-0 --name SAAS_GO_DB
+heroku addons:create heroku-postgresql:standard-0 --name saas-go-db
 
 # (Optional) Provision Redis
 heroku addons:create heroku-redis:hobby-dev
@@ -149,8 +149,10 @@ heroku addons:create heroku-redis:hobby-dev
 # Get DATABASE_URL
 heroku config:get DATABASE_URL
 
-# Set up follower pool for analytics
-heroku pg:follow SAAS_GO_DB --app saas-go-app --follow-name analytics-follower
+# Set up follower pool for analytics (via Heroku Dashboard)
+# Go to: https://dashboard.heroku.com/apps/saas-go-app
+# Click on the database addon → Create Follower/Follower Pool
+# Or check HEROKU_SETUP.md for detailed instructions
 
 # Get ANALYTICS_DB_URL from follower
 heroku config:get ANALYTICS_DB_URL
@@ -171,7 +173,7 @@ heroku open
 
 **Automatically Set by Heroku:**
 - `DATABASE_URL` - Automatically set by `heroku-postgresql` addon (primary database)
-- `ANALYTICS_DB_URL` - Automatically set when you create a follower pool with `heroku pg:follow`
+- `ANALYTICS_DB_URL` - Automatically set when you create a follower pool (via Heroku Dashboard)
 - `REDIS_URL` - Automatically set by `heroku-redis` addon (if provisioned)
 - `PORT` - Automatically set by Heroku platform
 

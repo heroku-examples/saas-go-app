@@ -1,0 +1,9 @@
+#!/bin/bash
+# Heroku compile script for Go buildpack
+# This script is run during the build phase
+
+# Set the package path for the main application
+export GO_INSTALL_PACKAGE_PATH="./cmd/server"
+
+# The buildpack will use this to build the binary
+# The binary will be named after the module (saas-go-app) and placed in bin/
