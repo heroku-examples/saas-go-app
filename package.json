@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "SaaS Go App - Full stack application with Go backend and Vue.js frontend",
   "scripts": {
-    "heroku-postbuild": "cd web/frontend && npm install && npm run build"
+    "heroku-postbuild": "echo 'Frontend dist folder is pre-built and committed, skipping build'"
   },
   "engines": {
     "node": "18.x",
