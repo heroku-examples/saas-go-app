@@ -75,10 +75,15 @@ func main() {
 	// In production, the frontend should be built and placed in web/frontend/dist
 	if _, err := os.Stat("web/frontend/dist"); err == nil {
 		// Serve static files
-		router.Static("/static", "web/frontend/dist/assets")
+		router.Static("/assets", "web/frontend/dist/assets")
 		router.StaticFile("/favicon.ico", "web/frontend/dist/favicon.ico")
 		
-		// Serve index.html for all non-API routes (SPA routing)
+		// Serve index.html for root route
+		router.GET("/", func(c *gin.Context) {
+			c.File("web/frontend/dist/index.html")
+		})
+		
+		// Serve index.html for all other non-API routes (SPA routing)
 		router.NoRoute(func(c *gin.Context) {
 			path := c.Request.URL.Path
 			// Don't serve frontend for API routes, health, or metrics
