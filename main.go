@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"saas-go-app/internal/api"
@@ -69,6 +70,25 @@ func main() {
 
 	// Set up Gin router
 	router := gin.Default()
+
+	// Root endpoint
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "SaaS Go App API",
+			"version": "1.0.0",
+			"endpoints": gin.H{
+				"health": "/health",
+				"metrics": "/metrics",
+				"auth": gin.H{
+					"login": "POST /api/auth/login",
+					"register": "POST /api/auth/register",
+				},
+				"customers": "GET, POST, PUT, DELETE /api/customers",
+				"accounts": "GET, POST, PUT, DELETE /api/accounts",
+				"analytics": "GET /api/analytics",
+			},
+		})
+	})
 
 	// Prometheus metrics endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
