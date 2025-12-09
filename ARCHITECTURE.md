@@ -159,16 +159,16 @@ graph TB
         Follower[(Follower Pool<br/>Read-Only Replica)]
     end
     
-    subgraph "Replication"
-        Replication[PostgreSQL<br/>Streaming Replication]
+    subgraph "Replication Process"
+        WALStream[PostgreSQL<br/>Streaming Replication]
     end
     
     WriteHandler -->|All Writes| Primary
     ReadHandler -->|Reads| Primary
     AnalyticsHandler -->|Read-Only Queries| Follower
     
-    Primary -.->|Streams WAL| Replication
-    Replication -.->|Applies Changes| Follower
+    Primary -.->|Streams WAL| WALStream
+    WALStream -.->|Applies Changes| Follower
     
     style Primary fill:#4a90e2
     style Follower fill:#50c878
