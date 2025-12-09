@@ -179,7 +179,10 @@ graph TB
 
 #### 1. **Database Initialization**
 
-The application initializes two separate database connections:
+**Important Note on Heroku Postgres Advanced (Next Generation)**:
+With [Heroku Postgres Advanced](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/), the follower pool architecture can automatically route read queries to followers and write queries to the leader through a single connection string. This means you may only need `DATABASE_URL` if your follower pool is configured for automatic read distribution.
+
+However, this application implements an **explicit two-connection approach** for fine-grained control:
 
 ```go
 // Primary database (required)
@@ -189,11 +192,24 @@ PrimaryDB *sql.DB  // Connected via DATABASE_URL
 AnalyticsDB *sql.DB  // Connected via ANALYTICS_DB_URL
 ```
 
+**Why Two Connections?**
+- **Explicit Control**: Choose exactly which queries go to follower vs leader
+- **Legacy Compatibility**: Works with all Heroku Postgres tiers (Standard, Premium, Advanced)
+- **Fine-Grained Routing**: Analytics queries explicitly use follower, transactional reads use primary
+- **Future Flexibility**: Can easily switch between automatic and explicit routing
+
 **Initialization Flow**:
-1. `InitPrimaryDB()` - Always connects to primary database
+1. `InitPrimaryDB()` - Always connects to primary database via `DATABASE_URL`
 2. `InitAnalyticsDB()` - Attempts to connect to follower pool
-   - If `ANALYTICS_DB_URL` is set → Connects to follower pool
-   - If not set → Falls back to `PrimaryDB` reference
+   - If `ANALYTICS_DB_URL` is set → Connects to follower pool explicitly
+   - If not set → Falls back to `PrimaryDB` reference (uses primary for analytics)
+
+**Alternative: Single Connection with Next Gen Postgres Advanced**
+If you're using Heroku Postgres Advanced with automatic read routing configured, you can use only `DATABASE_URL` and the database will automatically route:
+- Write operations → Leader
+- Read operations → Follower pool (if configured)
+
+In this case, you would modify the code to use a single connection for all operations, and the database layer handles the routing automatically.
 
 #### 2. **Query Routing Logic**
 
@@ -245,6 +261,29 @@ func CreateCustomer(c *gin.Context) {
 ```
 
 ### Replication Details
+
+#### Heroku Postgres Advanced (Next Generation)
+
+[Heroku Postgres Advanced](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/) introduces a proprietary follower pool architecture that provides:
+
+- **Automatic Read Distribution**: A single connection string can automatically route reads to followers and writes to the leader
+- **Named Follower Pools**: Organize database topology by attaching follower pools to specific applications
+- **Zero-Downtime Scaling**: Scale replicas horizontally or vertically without disrupting applications
+- **High Performance**: Over 4X throughput improvements and support for 200TB+ storage
+
+**Connection Approaches**:
+
+1. **Automatic Routing (Next Gen Postgres Advanced)**:
+   - Use only `DATABASE_URL` 
+   - Database automatically routes writes to leader, reads to follower pool
+   - Requires follower pool to be configured in Heroku Dashboard
+   - Simplest approach, but less explicit control
+
+2. **Explicit Routing (Current Implementation)**:
+   - Use `DATABASE_URL` for primary/leader
+   - Use `ANALYTICS_DB_URL` for follower pool (explicit connection)
+   - Application code explicitly chooses which database to query
+   - More control, works with all Postgres tiers
 
 #### PostgreSQL Streaming Replication
 
@@ -702,6 +741,23 @@ graph LR
 - Additional infrastructure cost
 - More complex connection management
 
+### 1a. **Why Explicit Two-Connection Approach vs. Automatic Routing?**
+
+**Decision**: This application uses explicit two-connection routing (`DATABASE_URL` + `ANALYTICS_DB_URL`) rather than relying on automatic routing from a single connection.
+
+**Reasoning**:
+- **Explicit Control**: We want to explicitly route analytics queries to followers, while keeping transactional reads on the primary for consistency
+- **Legacy Compatibility**: Works with all Heroku Postgres tiers, not just Advanced
+- **Clear Intent**: Code clearly shows which queries use which database
+- **Flexibility**: Can easily switch to automatic routing later if desired
+
+**Alternative Approach (Next Gen Postgres Advanced)**:
+With Heroku Postgres Advanced, you can use a single `DATABASE_URL` connection string that automatically routes:
+- Writes → Leader
+- Reads → Follower pool (if configured)
+
+This simplifies connection management but provides less explicit control over query routing. The current implementation can be modified to use this approach if desired.
+
 ### 2. **Why Not Use Follower for All Reads?**
 
 **Decision**: Only use follower pool for analytics, not for transactional reads.
@@ -761,23 +817,29 @@ The `/metrics` endpoint provides Prometheus-compatible metrics for:
 
 ### Potential Improvements
 
-1. **Connection Pooling Configuration**
+1. **Support for Next Gen Postgres Advanced Automatic Routing**
+   - Add option to use single `DATABASE_URL` with automatic read/write routing
+   - Leverage Heroku Postgres Advanced's proprietary follower pool architecture
+   - Simplify connection management while maintaining performance benefits
+   - Reference: [Heroku Postgres Advanced](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/)
+
+2. **Connection Pooling Configuration**
    - Make connection pool sizes configurable
    - Add metrics for connection pool usage
 
-2. **Read Replicas for Transactional Reads**
+3. **Read Replicas for Transactional Reads**
    - Add option to route some transactional reads to follower
    - Implement read preference based on consistency requirements
 
-3. **Caching Layer**
+4. **Caching Layer**
    - Add Redis caching for frequently accessed data
    - Cache analytics results with TTL
 
-4. **Database Sharding**
+5. **Database Sharding**
    - Partition customers/accounts by region or ID range
    - Route queries to appropriate shard
 
-5. **Event Sourcing**
+6. **Event Sourcing**
    - Store events instead of current state
    - Rebuild analytics from event stream
 
@@ -793,4 +855,6 @@ The SaaS Go App implements a clean separation between transactional operations a
 - **Simplicity**: Clear routing logic and easy to understand
 
 The application is designed to work with or without a follower pool, making it suitable for both development and production environments.
+
+**Note on Heroku Postgres Advanced**: With [Heroku Postgres Advanced (Next Generation)](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/), you can use a single connection string that automatically routes reads to followers and writes to the leader. The current implementation uses explicit two-connection routing for fine-grained control, but can be adapted to use automatic routing if desired.
 
