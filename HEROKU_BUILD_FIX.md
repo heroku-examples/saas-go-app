@@ -42,3 +42,6 @@ heroku config:set GO_INSTALL_PACKAGE_PATH=./cmd/server --app saas-go-app
 
 If this still doesn't work, we should move `main.go` to the root as it's the most reliable approach for Heroku.
 
+
+
+

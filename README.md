@@ -12,6 +12,8 @@ A SaaS web application backend built with Go and Gin, featuring Vue.js frontend,
 - **Vue.js Frontend** with Bootstrap styling
 - **Swagger/OpenAPI Documentation** with interactive API testing
 
+> 📖 **Architecture Documentation**: See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture diagrams, leader/follower pattern implementation, and system design decisions.
+
 ## Tech Stack
 
 - **Backend**: Go + Gin
@@ -71,7 +73,11 @@ PORT=8080
 SEED_DATA=true  # Set to "true" to populate database with sample data on startup
 ```
 
-**Note**: On Heroku, `DATABASE_URL`, `ANALYTICS_DB_URL`, `REDIS_URL`, and `PORT` are automatically set by Heroku addons. You only need to set `JWT_SECRET` manually.
+**Note**: On Heroku:
+- `DATABASE_URL` and `PORT` are automatically set by Heroku
+- `ANALYTICS_DB_URL` must be set manually to your follower pool connection string (see [HEROKU_SETUP.md](HEROKU_SETUP.md))
+- `REDIS_URL` is automatically set if you provision Heroku Redis addon
+- `JWT_SECRET` must be set manually: `heroku config:set JWT_SECRET=your-secret-key`
 
 3. Run the server:
 ```bash
@@ -81,6 +87,12 @@ go run ./cmd/server
 ```
 
 The server will automatically create database tables on startup.
+
+**Default Test User** (created when seeding data):
+- Username: `admin`
+- Password: `admin123`
+
+> **Note**: The default user is only created when `SEED_DATA=true` and the users table is empty. For production, you should register your own user and change/remove the default credentials.
 
 ### Frontend Setup
 
@@ -262,6 +274,27 @@ heroku open
 - `JWT_SECRET` - **You must set this manually**: `heroku config:set JWT_SECRET=your-secret-key`
 
 **Important**: When you provision Heroku Postgres Advanced and create a follower pool, Heroku automatically provides the connection URLs. You don't need to manually configure `DATABASE_URL` or `ANALYTICS_DB_URL` - they're set automatically by the addons.
+
+### Optional Features
+
+The application is designed to work with or without these optional features:
+
+- **Follower Pool (`ANALYTICS_DB_URL`)**: 
+  - **Optional** - The app gracefully falls back to using the primary database for analytics queries if not configured
+  - **Benefit**: Offloads read-only analytics queries to a follower, reducing load on the primary database
+  - **Requirement**: Requires Heroku Postgres Advanced (requires NGPG pilot program access)
+  - **Status**: App works perfectly without it - analytics endpoints will use the primary DB
+
+- **Redis (`REDIS_URL`)**:
+  - **Optional** - Background job processing is disabled if not configured
+  - **Benefit**: Enables async background jobs for data aggregation
+  - **Status**: App runs fine without it - you'll see a log message that background jobs are disabled
+
+**Summary**: The only truly required components are:
+- PostgreSQL database (`DATABASE_URL`)
+- JWT secret (`JWT_SECRET`)
+
+Everything else is optional and the app will work without them, just with reduced functionality.
 
 ## Development
 

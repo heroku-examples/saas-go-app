@@ -3,6 +3,8 @@ package db
 import (
 	"database/sql"
 	"log"
+
+	"saas-go-app/internal/auth"
 )
 
 // SeedData populates the database with sample customers and accounts
@@ -19,6 +21,27 @@ func SeedData() error {
 	}
 
 	log.Println("Seeding database with sample data...")
+
+	// Create default test user if users table is empty
+	var userCount int
+	err = PrimaryDB.QueryRow("SELECT COUNT(*) FROM users").Scan(&userCount)
+	if err == nil && userCount == 0 {
+		// Create default test user: admin / admin123
+		passwordHash, err := auth.HashPassword("admin123")
+		if err == nil {
+			_, err = PrimaryDB.Exec(
+				"INSERT INTO users (username, password_hash) VALUES ($1, $2)",
+				"admin", passwordHash,
+			)
+			if err == nil {
+				log.Println("Created default test user: username='admin', password='admin123'")
+			} else {
+				log.Printf("Warning: Failed to create default user: %v", err)
+			}
+		} else {
+			log.Printf("Warning: Failed to hash password for default user: %v", err)
+		}
+	}
 
 	// Sample customers
 	customers := []struct {
@@ -102,4 +125,7 @@ func SeedDataIfEmpty() error {
 	}
 	return SeedData()
 }
+
+
+
 

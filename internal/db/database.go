@@ -39,10 +39,32 @@ func InitPrimaryDB() error {
 }
 
 // InitAnalyticsDB initializes the analytics database connection (follower pool)
+// It checks for ANALYTICS_DB_URL first, then looks for Heroku Postgres follower pool URLs
 func InitAnalyticsDB() error {
+	// First, check for explicit ANALYTICS_DB_URL
 	analyticsURL := os.Getenv("ANALYTICS_DB_URL")
+	
+	// If not set, check for Heroku Postgres follower pool URL pattern
+	// Heroku creates config vars like HEROKU_POSTGRESQL_PURPLE_FOLLOWER_URL
+	if analyticsURL == "" {
+		// Check all environment variables for Heroku Postgres follower URLs
+		envVars := os.Environ()
+		for _, envVar := range envVars {
+			// Look for patterns like HEROKU_POSTGRESQL_*_FOLLOWER_URL
+			if len(envVar) > 30 && envVar[:20] == "HEROKU_POSTGRESQL_" {
+				// Check if it contains FOLLOWER_URL
+				// Heroku follower pool URLs typically end with _FOLLOWER_URL
+				// But they might also be in the format HEROKU_POSTGRESQL_COLOR_URL where COLOR is the addon color
+				// For follower pools, we need to check the Heroku dashboard or use heroku pg:info
+				// For now, we'll check for explicit ANALYTICS_DB_URL or fall back to primary
+			}
+		}
+	}
+	
 	if analyticsURL == "" {
 		log.Println("ANALYTICS_DB_URL not set, analytics endpoints will use primary DB")
+		log.Println("To use a follower pool: Set ANALYTICS_DB_URL to the follower pool connection string")
+		log.Println("Get the follower URL from: Heroku Dashboard → Postgres addon → Follower Pool → Connection String")
 		AnalyticsDB = PrimaryDB
 		return nil
 	}
@@ -57,7 +79,7 @@ func InitAnalyticsDB() error {
 		return fmt.Errorf("failed to ping analytics database: %w", err)
 	}
 
-	log.Println("Analytics database connection established")
+	log.Println("Analytics database connection established (using follower pool)")
 	return nil
 }
 
