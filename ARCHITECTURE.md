@@ -21,11 +21,16 @@ This document provides a comprehensive overview of the SaaS Go App architecture,
 The SaaS Go App is a full-stack web application built with:
 - **Backend**: Go (Golang) with Gin web framework
 - **Frontend**: Vue.js 3 with Bootstrap 5
-- **Primary Database**: PostgreSQL (Heroku Postgres)
-- **Analytics Database**: PostgreSQL Follower Pool (optional)
+- **Database**: Heroku Postgres Advanced (Next Generation) with automatic read/write routing
 - **Job Queue**: Redis with Asynq (optional)
 - **Monitoring**: Prometheus metrics
 - **Documentation**: Swagger/OpenAPI
+
+**Database Architecture**: The application uses [Heroku Postgres Advanced (Next Generation)](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/) with a single connection string that automatically routes:
+- **Write operations** (INSERT, UPDATE, DELETE) → Leader
+- **Read operations** (SELECT) → Follower pool (if configured)
+
+This eliminates the need for separate primary and analytics database connections, as the database layer handles routing automatically.
 
 ```mermaid
 graph TB
@@ -40,19 +45,28 @@ graph TB
     end
     
     subgraph "Data Layer"
-        PrimaryDB[(Primary PostgreSQL<br/>Leader)]
-        FollowerDB[(Follower Pool<br/>Read Replica)]
+        NGPG[(Heroku Postgres Advanced<br/>Next Generation<br/>Automatic Routing)]
         Redis[(Redis<br/>Job Queue)]
+    end
+    
+    subgraph "NGPG Internal"
+        Leader[(Leader<br/>Writes)]
+        Follower[(Follower Pool<br/>Reads)]
     end
     
     Browser --> Frontend
     API_Client --> Backend
     Frontend --> Backend
-    Backend --> PrimaryDB
-    Backend --> FollowerDB
+    Backend -->|Single Connection| NGPG
     Backend --> Redis
     
-    PrimaryDB -.->|Replication| FollowerDB
+    NGPG -.->|Auto Routes Writes| Leader
+    NGPG -.->|Auto Routes Reads| Follower
+    Leader -.->|Replication| Follower
+    
+    style NGPG fill:#4a90e2
+    style Leader fill:#4a90e2
+    style Follower fill:#50c878
 ```
 
 ---
@@ -78,8 +92,7 @@ graph LR
     end
     
     subgraph "Storage"
-        Primary[(Primary DB)]
-        Follower[(Follower Pool)]
+        NGPG_DB[(Heroku Postgres Advanced<br/>NGPG<br/>Auto Routing)]
         Redis_Store[(Redis)]
     end
     
@@ -89,8 +102,7 @@ graph LR
     Router_Gin --> Auth
     Auth --> Handlers
     Handlers --> DB_Layer
-    DB_Layer --> Primary
-    DB_Layer --> Follower
+    DB_Layer --> NGPG_DB
     Handlers --> Job_Processor
     Job_Processor --> Redis_Store
 ```
@@ -120,8 +132,9 @@ graph LR
 - **Location**: `internal/db/`
 - **Purpose**: Database connection and query management
 - **Components**:
-  - `PrimaryDB`: Connection to primary PostgreSQL (leader)
-  - `AnalyticsDB`: Connection to follower pool (optional)
+  - `PrimaryDB`: Connection to Heroku Postgres Advanced (NGPG) with automatic routing
+  - `AnalyticsDB`: Optional explicit follower pool connection (falls back to PrimaryDB if not set)
+- **NGPG Automatic Routing**: With Heroku Postgres Advanced, a single connection automatically routes writes to the leader and reads to the follower pool
 
 #### 4. **Background Jobs**
 - **Location**: `internal/jobs/`
@@ -145,6 +158,8 @@ The application implements a **leader/follower (primary/replica)** database patt
 
 ### Architecture Diagram
 
+**With Heroku Postgres Advanced (NGPG) - Automatic Routing:**
+
 ```mermaid
 graph TB
     subgraph "Application Layer"
@@ -154,26 +169,36 @@ graph TB
         AnalyticsHandler[Analytics Handler<br/>Aggregations, Stats]
     end
     
-    subgraph "Database Layer"
-        Primary[(Primary Database<br/>Leader<br/>Read/Write)]
-        Follower[(Follower Pool<br/>Read-Only Replica)]
+    subgraph "NGPG Database Layer"
+        NGPG[(Heroku Postgres Advanced<br/>Single Connection<br/>Automatic Routing)]
+    end
+    
+    subgraph "NGPG Internal Routing"
+        Leader[(Leader<br/>Writes)]
+        Follower[(Follower Pool<br/>Reads)]
     end
     
     subgraph "Replication Process"
         WALStream[PostgreSQL<br/>Streaming Replication]
     end
     
-    WriteHandler -->|All Writes| Primary
-    ReadHandler -->|Reads| Primary
-    AnalyticsHandler -->|Read-Only Queries| Follower
+    WriteHandler -->|Single Connection| NGPG
+    ReadHandler -->|Single Connection| NGPG
+    AnalyticsHandler -->|Single Connection| NGPG
     
-    Primary -.->|Streams WAL| WALStream
+    NGPG -.->|Auto Routes Writes| Leader
+    NGPG -.->|Auto Routes Reads| Follower
+    
+    Leader -.->|Streams WAL| WALStream
     WALStream -.->|Applies Changes| Follower
     
-    style Primary fill:#4a90e2
+    style NGPG fill:#4a90e2
+    style Leader fill:#4a90e2
     style Follower fill:#50c878
     style AnalyticsHandler fill:#ffa500
 ```
+
+**Note**: The application also supports explicit two-connection routing for legacy Postgres tiers or when fine-grained control is needed.
 
 ### Key Implementation Points
 
@@ -213,7 +238,25 @@ In this case, you would modify the code to use a single connection for all opera
 
 #### 2. **Query Routing Logic**
 
-The application routes queries based on operation type:
+**With NGPG Automatic Routing** (Recommended):
+The database automatically routes queries through a single connection:
+
+```mermaid
+flowchart TD
+    Start[API Request] --> CheckType{Request Type?}
+    
+    CheckType -->|Write Operation<br/>POST, PUT, DELETE| NGPG[Single Connection<br/>NGPG]
+    CheckType -->|Read Operation<br/>GET /customers, /accounts| NGPG
+    CheckType -->|Analytics Operation<br/>GET /analytics| NGPG
+    
+    NGPG -->|Auto Routes| Execute[Database Executes Query]
+    Execute -->|Writes → Leader<br/>Reads → Follower| Response[Return Response]
+    
+    style NGPG fill:#4a90e2
+```
+
+**With Explicit Routing** (Legacy/Advanced Control):
+The application explicitly chooses which database connection to use:
 
 ```mermaid
 flowchart TD
@@ -287,23 +330,47 @@ func CreateCustomer(c *gin.Context) {
 
 #### PostgreSQL Streaming Replication
 
-Heroku Postgres Advanced uses PostgreSQL's native streaming replication:
+**With NGPG Automatic Routing:**
 
 ```mermaid
 sequenceDiagram
     participant App as Application
-    participant Primary as Primary DB (Leader)
+    participant NGPG as NGPG Database<br/>(Auto Routing)
+    participant Leader as Leader
     participant WAL as Write-Ahead Log
     participant Follower as Follower Pool
     
-    App->>Primary: INSERT/UPDATE/DELETE
-    Primary->>Primary: Commit Transaction
-    Primary->>WAL: Write to WAL
+    App->>NGPG: INSERT/UPDATE/DELETE<br/>(Single Connection)
+    NGPG->>Leader: Auto Route Write
+    Leader->>Leader: Commit Transaction
+    Leader->>WAL: Write to WAL
     WAL->>Follower: Stream WAL Records
     Follower->>Follower: Apply Changes
     Note over Follower: Data is eventually consistent<br/>(typically < 1 second lag)
     
-    App->>Follower: SELECT (Read-Only)
+    App->>NGPG: SELECT (Read-Only)<br/>(Single Connection)
+    NGPG->>Follower: Auto Route Read
+    Follower->>NGPG: Return Results
+    NGPG->>App: Return Results
+```
+
+**With Explicit Routing (Legacy):**
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Leader as Primary DB (Leader)
+    participant WAL as Write-Ahead Log
+    participant Follower as Follower Pool
+    
+    App->>Leader: INSERT/UPDATE/DELETE<br/>(Explicit Connection)
+    Leader->>Leader: Commit Transaction
+    Leader->>WAL: Write to WAL
+    WAL->>Follower: Stream WAL Records
+    Follower->>Follower: Apply Changes
+    Note over Follower: Data is eventually consistent<br/>(typically < 1 second lag)
+    
+    App->>Follower: SELECT (Read-Only)<br/>(Explicit Connection)
     Follower->>App: Return Results
 ```
 
@@ -319,6 +386,8 @@ sequenceDiagram
 
 ### Write Operations Flow
 
+**With NGPG (Automatic Routing):**
+
 ```mermaid
 sequenceDiagram
     participant User as User/Browser
@@ -326,15 +395,18 @@ sequenceDiagram
     participant API as Go API Server
     participant Auth as Auth Middleware
     participant Handler as API Handler
-    participant PrimaryDB as Primary Database
+    participant NGPG as NGPG Database<br/>(Auto Routing)
+    participant Leader as Leader
     
     User->>Frontend: Create Customer
     Frontend->>API: POST /api/customers<br/>{name, email}
     API->>Auth: Validate JWT Token
     Auth->>API: Token Valid
     API->>Handler: CreateCustomer()
-    Handler->>PrimaryDB: INSERT INTO customers
-    PrimaryDB->>Handler: Return ID
+    Handler->>NGPG: INSERT INTO customers<br/>(Single Connection)
+    NGPG->>Leader: Auto Route Write
+    Leader->>NGPG: Return ID
+    NGPG->>Handler: Return ID
     Handler->>API: JSON Response
     API->>Frontend: 201 Created
     Frontend->>User: Show Success
@@ -342,25 +414,32 @@ sequenceDiagram
 
 ### Read Operations Flow (CRUD)
 
+**With NGPG (Automatic Routing):**
+
 ```mermaid
 sequenceDiagram
     participant User as User/Browser
     participant Frontend as Vue.js Frontend
     participant API as Go API Server
     participant Handler as API Handler
-    participant PrimaryDB as Primary Database
+    participant NGPG as NGPG Database<br/>(Auto Routing)
+    participant Follower as Follower Pool
     
     User->>Frontend: View Customers
     Frontend->>API: GET /api/customers
     API->>Handler: GetCustomers()
-    Handler->>PrimaryDB: SELECT * FROM customers
-    PrimaryDB->>Handler: Return Results
+    Handler->>NGPG: SELECT * FROM customers<br/>(Single Connection)
+    NGPG->>Follower: Auto Route Read
+    Follower->>NGPG: Return Results
+    NGPG->>Handler: Return Results
     Handler->>API: JSON Response
     API->>Frontend: 200 OK
     Frontend->>User: Display Customers
 ```
 
-### Analytics Operations Flow (Follower Pool)
+### Analytics Operations Flow
+
+**With NGPG (Automatic Routing):**
 
 ```mermaid
 sequenceDiagram
@@ -368,27 +447,24 @@ sequenceDiagram
     participant Frontend as Vue.js Frontend
     participant API as Go API Server
     participant Handler as Analytics Handler
-    participant FollowerDB as Follower Pool
-    participant PrimaryDB as Primary Database
+    participant NGPG as NGPG Database<br/>(Auto Routing)
+    participant Follower as Follower Pool
     
     User->>Frontend: View Dashboard
     Frontend->>API: GET /api/analytics
     API->>Handler: GetAnalytics()
     
-    alt Follower Pool Configured
-        Handler->>FollowerDB: SELECT COUNT(*) FROM customers
-        Handler->>FollowerDB: SELECT COUNT(*) FROM accounts
-        FollowerDB->>Handler: Return Aggregated Data
-    else Follower Pool Not Configured
-        Handler->>PrimaryDB: SELECT COUNT(*) FROM customers
-        Handler->>PrimaryDB: SELECT COUNT(*) FROM accounts
-        PrimaryDB->>Handler: Return Aggregated Data
-    end
+    Handler->>NGPG: SELECT COUNT(*) FROM customers<br/>(Single Connection)
+    NGPG->>Follower: Auto Route Read
+    Follower->>NGPG: Return Aggregated Data
+    NGPG->>Handler: Return Aggregated Data
     
     Handler->>API: JSON Response
     API->>Frontend: 200 OK
     Frontend->>User: Display Analytics
 ```
+
+**Note**: With explicit routing (legacy), analytics queries would explicitly use a separate follower pool connection if `ANALYTICS_DB_URL` is configured.
 
 ---
 
@@ -418,13 +494,12 @@ graph TD
     Analytics --> AnalyticsOverview[GET /api/analytics]
     Analytics --> CustomerAnalytics[GET /api/analytics/customers/:id]
     
-    Customers --> PrimaryDB[(Primary DB)]
-    Accounts --> PrimaryDB
-    AnalyticsOverview --> FollowerDB[(Follower Pool)]
-    CustomerAnalytics --> FollowerDB
+    Customers --> NGPG_DB[(NGPG Database<br/>Auto Routing)]
+    Accounts --> NGPG_DB
+    AnalyticsOverview --> NGPG_DB
+    CustomerAnalytics --> NGPG_DB
     
-    style FollowerDB fill:#50c878
-    style PrimaryDB fill:#4a90e2
+    style NGPG_DB fill:#4a90e2
 ```
 
 ### Database Selection Matrix
@@ -443,13 +518,17 @@ graph TD
 | `/api/accounts/:id` | GET | Primary | Read operation (transactional data) |
 | `/api/accounts/:id` | PUT | Primary | Write operation |
 | `/api/accounts/:id` | DELETE | Primary | Write operation |
-| `/api/analytics` | GET | **Follower** | Read-only aggregation (can tolerate slight lag) |
-| `/api/analytics/customers/:id` | GET | **Follower** | Read-only aggregation (can tolerate slight lag) |
+| `/api/analytics` | GET | **NGPG (Auto Routes to Follower)** | Read-only aggregation (can tolerate slight lag) |
+| `/api/analytics/customers/:id` | GET | **NGPG (Auto Routes to Follower)** | Read-only aggregation (can tolerate slight lag) |
 
-**Key Decision Points**:
-- **Transactional Reads** (customers, accounts) → Primary DB (need latest data)
-- **Analytics Reads** (aggregations, counts) → Follower Pool (can tolerate replication lag)
-- **All Writes** → Primary DB (only leader accepts writes)
+**Key Decision Points (NGPG Automatic Routing)**:
+- **All Operations** → Single NGPG connection
+- **Writes** → Automatically routed to Leader by NGPG
+- **Reads** → Automatically routed to Follower Pool by NGPG (if configured)
+- **Transactional Reads** → May go to Leader for consistency (NGPG decision)
+- **Analytics Reads** → Routed to Follower Pool (NGPG decision)
+
+**Note**: With explicit routing (legacy), the application explicitly chooses which database connection to use.
 
 ---
 
@@ -463,11 +542,15 @@ flowchart TD
     LoadEnv --> InitJWT[Initialize JWT]
     InitJWT --> InitPrimary[InitPrimaryDB]
     
-    InitPrimary --> CheckDATABASE{DATABASE_URL<br/>Set?}
-    CheckDATABASE -->|No| Error1[Fatal Error:<br/>DATABASE_URL required]
-    CheckDATABASE -->|Yes| ConnectPrimary[Connect to Primary DB]
-    ConnectPrimary --> PingPrimary[Ping Primary DB]
-    PingPrimary --> Success1[Primary DB Connected]
+    InitPrimary --> CheckNGPG{NGPG Connection<br/>Available?<br/>HEROKU_POSTGRESQL_*_URL}
+    CheckNGPG -->|Yes| UseNGPG[Use NGPG Connection<br/>HEROKU_POSTGRESQL_*_URL]
+    CheckNGPG -->|No| CheckDATABASE{DATABASE_URL<br/>Set?}
+    CheckDATABASE -->|No| Error1[Fatal Error:<br/>No database connection]
+    CheckDATABASE -->|Yes| UseDATABASE[Use DATABASE_URL]
+    UseNGPG --> ConnectDB[Connect to Database]
+    UseDATABASE --> ConnectDB
+    ConnectDB --> PingDB[Ping Database]
+    PingDB --> Success1[Database Connected<br/>NGPG Auto Routing Enabled]
     
     Success1 --> InitAnalytics[InitAnalyticsDB]
     InitAnalytics --> CheckANALYTICS{ANALYTICS_DB_URL<br/>Set?}
@@ -538,10 +621,10 @@ graph TB
     
     JobServer -->|Poll Queue| Queue
     JobServer --> JobHandler
-    JobHandler --> PrimaryDB[(Primary DB)]
+    JobHandler --> NGPG_DB[(NGPG Database<br/>Auto Routing)]
     
     style Queue fill:#dc3545
-    style PrimaryDB fill:#4a90e2
+    style NGPG_DB fill:#4a90e2
 ```
 
 ### Job Processing Flow
@@ -553,7 +636,7 @@ sequenceDiagram
     participant Redis as Redis Queue
     participant Server as Asynq Server
     participant Handler as Job Handler
-    participant DB as Primary Database
+    participant DB as NGPG Database<br/>(Auto Routing)
     
     API->>Client: EnqueueAggregationTask()
     Client->>Redis: Push to Queue
@@ -598,7 +681,7 @@ sequenceDiagram
     participant Frontend as Frontend
     participant API as API Server
     participant Auth as Auth Module
-    participant DB as Primary Database
+    participant DB as NGPG Database<br/>(Auto Routing)
     
     User->>Frontend: Enter Credentials
     Frontend->>API: POST /api/auth/login<br/>{username, password}
@@ -660,8 +743,7 @@ graph TB
         end
         
         subgraph "Addons"
-            PrimaryAddon[Heroku Postgres<br/>Primary Database]
-            FollowerAddon[Heroku Postgres<br/>Follower Pool]
+            NGPG_Addon[Heroku Postgres Advanced<br/>Next Generation<br/>Single Connection]
             RedisAddon[Heroku Redis<br/>Optional]
         end
     end
@@ -677,18 +759,14 @@ graph TB
     end
     
     Users --> App
-    App --> PrimaryAddon
-    App --> FollowerAddon
+    App -->|Single Connection<br/>Auto Routing| NGPG_Addon
     App --> RedisAddon
     App --> CDN
     
     Buildpack1 --> App
     Buildpack2 --> App
     
-    PrimaryAddon -.->|Replication| FollowerAddon
-    
-    style FollowerAddon fill:#50c878
-    style PrimaryAddon fill:#4a90e2
+    style NGPG_Addon fill:#4a90e2
     style RedisAddon fill:#dc3545
 ```
 
@@ -697,8 +775,9 @@ graph TB
 ```mermaid
 graph LR
     subgraph "Environment Variables"
-        DATABASE_URL[DATABASE_URL<br/>Auto-set by Heroku]
-        ANALYTICS_DB_URL[ANALYTICS_DB_URL<br/>Manually Set]
+        NGPG_URL[HEROKU_POSTGRESQL_*_URL<br/>Auto-set by NGPG Addon]
+        DATABASE_URL[DATABASE_URL<br/>Auto-set by Heroku<br/>Fallback]
+        ANALYTICS_DB_URL[ANALYTICS_DB_URL<br/>Optional<br/>Explicit Routing]
         REDIS_URL[REDIS_URL<br/>Auto-set if provisioned]
         JWT_SECRET[JWT_SECRET<br/>Manually Set]
         PORT[PORT<br/>Auto-set by Heroku]
@@ -709,13 +788,15 @@ graph LR
         Config[Configuration]
     end
     
-    DATABASE_URL --> Config
-    ANALYTICS_DB_URL --> Config
+    NGPG_URL -->|Preferred| Config
+    DATABASE_URL -->|Fallback| Config
+    ANALYTICS_DB_URL -.->|Optional| Config
     REDIS_URL --> Config
     JWT_SECRET --> Config
     PORT --> Config
     SEED_DATA --> Config
     
+    style NGPG_URL fill:#4a90e2
     style ANALYTICS_DB_URL fill:#ffa500
     style JWT_SECRET fill:#ffa500
 ```
