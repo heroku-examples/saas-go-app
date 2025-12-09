@@ -8,11 +8,9 @@ import (
 	"testing"
 
 	"saas-go-app/internal/auth"
-	"saas-go-app/internal/db"
 	"saas-go-app/internal/models"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 )
 
 func setupTestDB(t *testing.T) {
