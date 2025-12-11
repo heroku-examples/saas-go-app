@@ -28,6 +28,7 @@ This guide helps you present the SaaS Go App project to highlight Heroku Postgre
 - A customer and account management system (SaaS demo)
 - Built with Go (backend) and Vue.js (frontend)
 - Full CRUD operations, authentication, analytics dashboard
+- [Swagger/OpenAPI Documentation](https://saas-go-app-d7a6a4d068d6.herokuapp.com/swagger/index.html)
 
 **The NGPG Magic:**
 - **Single Connection**: One `DATABASE_URL` connection string. 

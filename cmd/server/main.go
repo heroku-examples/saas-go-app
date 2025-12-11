@@ -39,6 +39,13 @@ func main() {
 		log.Fatal("Failed to create database tables:", err)
 	}
 
+	// Seed database with sample data if SEED_DATA is set
+	if os.Getenv("SEED_DATA") == "true" {
+		if err := db.SeedDataIfEmpty(); err != nil {
+			log.Printf("Warning: Failed to seed database: %v", err)
+		}
+	}
+
 	// Initialize background job processor
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL != "" {

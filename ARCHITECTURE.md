@@ -39,7 +39,7 @@ The SaaS Go App is a full-stack web application built with:
 - **Database**: Heroku Postgres Advanced (Next Generation) with automatic read/write routing
 - **Job Queue**: Redis with Asynq (optional)
 - **Monitoring**: Prometheus metrics
-- **Documentation**: Swagger/OpenAPI
+- **Documentation**: [Swagger/OpenAPI](https://saas-go-app-d7a6a4d068d6.herokuapp.com/swagger/index.html)
 
 **Database Architecture**: The application uses [Heroku Postgres Advanced (Next Generation)](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/) with a single connection string that automatically routes:
 - **Write operations** (INSERT, UPDATE, DELETE) → Leader

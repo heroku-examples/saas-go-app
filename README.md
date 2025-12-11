@@ -94,6 +94,36 @@ The server will automatically create database tables on startup.
 
 > **Note**: The default user is only created when `SEED_DATA=true` and the users table is empty. For production, you should register your own user and change/remove the default credentials.
 
+**Performance Demo Data** (for NGPG showcase):
+To generate large datasets for demonstrating NGPG performance features, set:
+```bash
+SEED_DATA=true
+SEED_PERFORMANCE_DATA=true
+SEED_CUSTOMERS=1000          # Number of customers (default: 1000)
+SEED_ACCOUNTS_PER_CUSTOMER=5 # Accounts per customer (default: 5)
+```
+
+This will generate thousands of records to showcase:
+- Read scaling with follower pools
+- Analytics query performance
+- Automatic query routing between leader and followers
+
+The performance data generation creates realistic company names, emails, and account distributions with varied statuses.
+
+**Clear and Reseed Database** (for local development):
+```bash
+# Basic reseed
+make reseed
+
+# Reseed with performance data
+SEED_PERFORMANCE_DATA=true make reseed
+
+# Custom amount
+SEED_PERFORMANCE_DATA=true SEED_CUSTOMERS=2000 SEED_ACCOUNTS_PER_CUSTOMER=10 make reseed
+```
+
+This will clear all existing customers and accounts, then regenerate data based on your environment variables.
+
 ### Frontend Setup
 
 1. Navigate to the frontend directory:

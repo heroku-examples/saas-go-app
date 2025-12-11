@@ -40,6 +40,15 @@ seed-once:
 	@echo "Note: This will seed the database if it's empty"
 	@SEED_DATA=true timeout 5 go run ./main.go || true
 
+# Clear and reseed database (useful for regenerating demo data)
+# Usage: 
+#   make reseed                    # Basic seed data
+#   SEED_PERFORMANCE_DATA=true make reseed  # Performance data
+#   SEED_PERFORMANCE_DATA=true SEED_CUSTOMERS=2000 make reseed  # Custom amount
+reseed:
+	@echo "Clearing and reseeding database..."
+	@go run ./cmd/reseed
+
 # Format code
 fmt:
 	go fmt ./...
