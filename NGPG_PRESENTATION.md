@@ -30,7 +30,8 @@ This guide helps you present the SaaS Go App project to highlight Heroku Postgre
 - Full CRUD operations, authentication, analytics dashboard
 
 **The NGPG Magic:**
-- **Single Connection**: One `DATABASE_URL` connection string
+- **Single Connection**: One `DATABASE_URL` connection string. 
+> Note: In the current configuration variable setup, we're using `HEROKU_POSTGRESQL_PURPLE_URL` as the database connection string for NGPG usage. The `DATABASE_URL` and `ANALYTICS_DB_URL` are used for the legacy implementation of _leader_ and _follower_ connections.
 - **Automatic Routing**: 
   - Writes (INSERT, UPDATE, DELETE) → Automatically go to leader
   - Reads (SELECT) → Automatically go to follower pool
@@ -125,7 +126,7 @@ db.Query("SELECT ...") // Database routes to follower
 
 ### For Technical Audiences
 
-- **Architecture**: Show the architecture diagrams in `ARCHITECTURE.md`
+- **Architecture**: Show the architecture diagrams in [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **Code**: Walk through `internal/db/database.go` to show automatic detection
 - **Performance**: Discuss the 4X throughput improvements
 - **Scalability**: Explain follower pool architecture
@@ -155,8 +156,8 @@ db.Query("SELECT ...") // Database routes to follower
 ## Resources to Share
 
 - **Application**: [GitHub Repository](https://github.com/heroku-examples/saas-go-app) or [Live Demo URL](https://saas-go-app-d7a6a4d068d6.herokuapp.com/dashboard)
-- **Architecture Docs**: `ARCHITECTURE.md` - Comprehensive diagrams and explanations
-- **Setup Guide**: `NGPG_SETUP.md` - How to configure NGPG
+- **Architecture Docs**: [`ARCHITECTURE.md`](ARCHITECTURE.md) - Comprehensive diagrams and explanations
+- **Setup Guide**: []`NGPG_SETUP.md`](NGPG_SETUP.md) - How to configure NGPG
 - **Heroku Blog**: [Next Gen Postgres Announcement](https://www.heroku.com/blog/introducing-the-next-generation-of-heroku-postgres/)
 - **Heroku Docs**: [Postgres Performance Guide](https://devcenter.heroku.com/articles/getting-started-postgres-performance)
 
